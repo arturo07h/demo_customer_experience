@@ -23,7 +23,9 @@ list_sheets_dataRaw <- names_sheet_dataRaw  |>  set_names() |>
 dataMetricas <- list_sheets_dataRaw$`Sheet 1`
 
 ## Vectores de aplicación
-vect_drv <- c("Nacional",funique(dataMetricas$id_region))
+vect_input <- dataMetricas |> fcount(id_region,id_subregion,sort = T) |>
+  rowbind(data.frame(id_region = "Nacional",id_subregion = "R1-S1", N = NA)) |> 
+  fselect(-N)
 
 ## Cálculos por DRV y Subregion y por mes
 
@@ -75,141 +77,141 @@ theme <- bs_theme(
   "input-border-color" = "white"
 )
 
-vbx <- list(
-  
-  value_box(
-    title = tags$p("NPS", style = "font-size: 200%;font-weight: bold;"),
-    value = uiOutput("value_nps"),
-    showcase = plotlyOutput("graf_nps"),
-    showcase_layout = "bottom"
-  ),
-  
-  value_box(
-    title = tags$p("CSAT", style = "font-size: 200%;font-weight: bold;"),
-    value = uiOutput("value_csat"),
-    showcase = plotlyOutput("graf_csat"),
-    showcase_layout = "bottom"
-  ),
-  
-  value_box(
-    title = tags$p("CES", style = "font-size: 200%;font-weight: bold;"),
-    value = uiOutput("value_ces"),
-    showcase = plotlyOutput("graf_ces"),
-    showcase_layout = "bottom"
-  )
-  
-)
-
 ## UI
 ui <- fluidPage(
   
   theme = theme,
   
-  ## Estilo de values box
-  tags$style(HTML("
+  tags$h2("Indicadores de experiencia del cliente"),
+  
+  tabsetPanel(
+   
+    tabPanel(
+      "Info. Nacional",
+      
+      ## Estilo de values box
+      tags$style(HTML("
     .card {
       background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
       border: none; /* Opcional: quitar bordes */
       box-shadow: none; /* Opcional: quitar sombra */
-    }
-  ")),
-  
-  ## Título y filtro regional
-  fluidRow(
-    column(
-      9,
-      tags$h2("Indicadores de experiencia del cliente"),
-    ),
-    column(
-      3,
-      selectInput(inputId = "vect_drv", choices = vect_drv, label = "Selecciona tu región:", selected = "Nacional")
-    )
-  ),
-  
-  ## Columns de values box
-  fluidRow(
-    column(
-      4 ,
-      value_box(
-        title = tags$p("NPS", style = "font-size: 200%;font-weight: bold;"),
-        value = uiOutput("value_nps"),
-        showcase = plotlyOutput("graf_nps"),
-        showcase_layout = "bottom"
-      )
-    ),
-    column(
-      4,
-      value_box(
-        title = tags$p("CSAT", style = "font-size: 200%;font-weight: bold;"),
-        value = uiOutput("value_csat"),
-        showcase = plotlyOutput("graf_csat"),
-        showcase_layout = "bottom"
-      )
-    ),
-    column(
-      4,
-      value_box(
-        title = tags$p("CES", style = "font-size: 200%;font-weight: bold;"),
-        value = uiOutput("value_ces"),
-        showcase = plotlyOutput("graf_ces"),
-        showcase_layout = "bottom"
-      )
-    )
-  ),
-  fluidRow(
-    column(
-      4,
-      div(
-        style = "
-        background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
-        border: none; /* Opcional: quitar bordes */
-        box-shadow: none; /* Opcional: quitar sombra */
-        border-radius: 15px; /* Esquinas redondeadas */
-        padding: 10px; /* Opcional: espacio interno */
-        height: 430px;
-        width:100%; 
-        ",
-        echarts4rOutput("graf_nps_comp", height = "400px", width = "100%")
-      )
-    ),
-    column(
-      4,
-      div(
-        # class = "small-graph", 
-        style = "
-        background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
-        border: none; /* Opcional: quitar bordes */
-        box-shadow: none; /* Opcional: quitar sombra */
-        border-radius: 15px; /* Esquinas redondeadas */
-        padding: 10px; /* Opcional: espacio interno */
-        height: 430px;
-        width:100%; 
-        ",
-        echarts4rOutput("graf_evo_fcr", height = "240px", width = "100%"),
-        echarts4rOutput("graf_fcr_gauge", height = "250px", width = "100%")
-      )
-    ),
-    column(
-      4,
-      div(
-        style = "
-        display: flex; 
-        flex-direction: column; 
-        align-items: left; 
-        height: 450px;
-        width:100%; 
-        ",
-        value_box(
-          title = tags$p("Tiempo promedio de respuesta", style = "font-size: 120%;font-weight: bold;"),
-          value = uiOutput("value_tiempo_resp"),
-          showcase = plotlyOutput("graf_tiempo_res"),
-          showcase_layout = "bottom"
+      }")),
+      
+      ## Título y filtro regional
+      fluidRow(
+        column(
+          3,
+          selectInput(
+            inputId = "vect_drv", 
+            choices = funique(vect_input$id_region), 
+            label = "Selecciona tu región:", 
+            selected = "Nacional"
+          )
+        )
+      ),
+      
+      ## Columns de values box
+      fluidRow(
+        column(
+          4 ,
+          value_box(
+            title = tags$p("NPS", style = "font-size: 200%;font-weight: bold;"),
+            value = uiOutput("value_nps"),
+            showcase = plotlyOutput("graf_nps"),
+            showcase_layout = "bottom"
+          )
         ),
-        value_box(
-          title = tags$p("Tasa de retención", style = "font-size: 120%;font-weight: bold;"),
-          value = uiOutput("value_tasa_ret"),
-          showcase = plotlyOutput("graf_tasa_ret"),
-          showcase_layout = "bottom"
+        column(
+          4,
+          value_box(
+            title = tags$p("CSAT", style = "font-size: 200%;font-weight: bold;"),
+            value = uiOutput("value_csat"),
+            showcase = plotlyOutput("graf_csat"),
+            showcase_layout = "bottom"
+          )
+        ),
+        column(
+          4,
+          value_box(
+            title = tags$p("CES", style = "font-size: 200%;font-weight: bold;"),
+            value = uiOutput("value_ces"),
+            showcase = plotlyOutput("graf_ces"),
+            showcase_layout = "bottom"
+          )
+        )
+      ),
+      fluidRow(
+        column(
+          4,
+          div(
+            style = "
+        background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
+        border: none; /* Opcional: quitar bordes */
+        box-shadow: none; /* Opcional: quitar sombra */
+        border-radius: 15px; /* Esquinas redondeadas */
+        padding: 10px; /* Opcional: espacio interno */
+        height: 430px;
+        width:100%; 
+        ",
+            echarts4rOutput("graf_nps_comp", height = "400px", width = "100%")
+          )
+        ),
+        column(
+          4,
+          div(
+            # class = "small-graph", 
+            style = "
+        background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
+        border: none; /* Opcional: quitar bordes */
+        box-shadow: none; /* Opcional: quitar sombra */
+        border-radius: 15px; /* Esquinas redondeadas */
+        padding: 10px; /* Opcional: espacio interno */
+        height: 430px;
+        width:100%; 
+        ",
+            echarts4rOutput("graf_evo_fcr", height = "240px", width = "100%"),
+            echarts4rOutput("graf_fcr_gauge", height = "250px", width = "100%")
+          )
+        ),
+        column(
+          4,
+          div(
+            style = "
+            display: flex; 
+            flex-direction: column; 
+            align-items: left; 
+            height: 450px;
+            width:100%; 
+            ",
+            value_box(
+              title = tags$p("Tiempo promedio de respuesta", style = "font-size: 120%;font-weight: bold;"),
+              value = uiOutput("value_tiempo_resp"),
+              showcase = plotlyOutput("graf_tiempo_res"),
+              showcase_layout = "bottom"
+            ),
+            value_box(
+              title = tags$p("Tasa de retención", style = "font-size: 120%;font-weight: bold;"),
+              value = uiOutput("value_tasa_ret"),
+              showcase = plotlyOutput("graf_tasa_ret"),
+              showcase_layout = "bottom"
+            )
+          )
+        )
+      )
+      
+    ),
+    
+    tabPanel(
+      "Local",
+      fluidRow(
+        column(
+          3,
+          selectInput(
+            inputId = "vect_sdrv", 
+            choices = funique(vect_input$id_subregion), 
+            label = "Selecciona tu subregión:", 
+            selected = "R1-S1"
+          )
         )
       )
     )
@@ -217,15 +219,34 @@ ui <- fluidPage(
 )
 
 ## Server
-server <- function(input, output){
+server <- function(input, output, session){
+  
+  ## Filtros update
+  observe({
+    updateSelectInput(
+      session,
+      "vect_drv",
+      choices = sort(funique(vect_input$id_region))
+    )
+  })
+  
+  observe({
+    updateSelectInput(
+      session,
+      "vect_sdrv",
+      choices = vect_input |> 
+        fsubset(id_region == input$vect_drv) |> 
+        select(id_subregion) %>%
+        .[[1]] %>% 
+        sort(.)
+    )
+  })
   
   ## Sección de data reactiva
   
   ### Valor actual de componentes
   data_componentes <- reactive({
-    
     data_ultimo_valor |> fsubset(id_region == input$vect_drv)
-    
   })
   
   ### Data de evolución de componentes
