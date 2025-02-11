@@ -196,7 +196,7 @@ ui <- fluidPage(
         display: flex; 
         flex-direction: column; 
         align-items: left; 
-        height: 100%;
+        height: 450px;
         width:100%; 
         ",
         value_box(
