@@ -213,12 +213,36 @@ ui <- fluidPage(
             selected = "R1-S1"
           )
         )
+      ),
+      fluidRow(
+        column(
+          4,
+          value_box(
+            title = tags$p("NPS", style = "font-size: 120%;font-weight: bold;"),
+            value = uiOutput("nps_subreg"),
+          )
+        ),
+        column(
+          4,
+          value_box(
+            title = tags$p("CSAT", style = "font-size: 120%;font-weight: bold;"),
+            value = uiOutput("csat_subreg"),
+          )
+        ),
+        column(
+          4,
+          value_box(
+            title = tags$p("CES", style = "font-size: 120%;font-weight: bold;"),
+            value = uiOutput("ces_subreg"),
+          )
+        )
       )
     )
   )
 )
 
-## Server
+
+# Server ------------------------------------------------------------------
 server <- function(input, output, session){
   
   ## Filtros update
@@ -275,6 +299,31 @@ server <- function(input, output, session){
   
   output$value_tasa_ret <- renderText({
     round(funique(data_componentes()$tasa_retencion),2)
+  })
+  
+  ## Componentes por subregion 
+  data_subreg <- reactive({
+    data_subregiones |> fsubset(id_subregion == input$vect_sdrv)
+  })
+  
+  ## Value box con echaerts4r para Subregiones
+  
+  ### NPS 
+  output$nps_subreg <- renderText({
+    data <- data_subreg() |> fsubset(fecha == fmax(fecha))
+    round(funique(data$nps),2)
+  })
+  
+  ### CSAT
+  output$csat_subreg <- renderText({
+    data <- data_subreg() |> fsubset(fecha == fmax(fecha))
+    round(funique(data$csat),2)
+  })
+  
+  ### CES
+  output$ces_subreg <- renderText({
+    data <- data_subreg() |> fsubset(fecha == fmax(fecha))
+    round(funique(data$ces),2)
   })
   
   ### Gráficos de evolución de componentes
