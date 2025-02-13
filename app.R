@@ -11,6 +11,10 @@ Sys.setlocale("LC_TIME", "es_ES.UTF-8")
 # Cargar base de datos ----------------------------------------------------
 rutaData <- "./data_customer_experience_demo.xlsx"
 
+# Parámetros --------------------------------------------------------------
+col_lineVB_nac <- "#c1121f"
+col_lineVB_sub <- "#31572c"
+
 # Leer bases --------------------------------------------------------------
 wb <- openxlsx2::wb_load(rutaData)
 names_sheet_dataRaw <- openxlsx2::wb_get_sheet_names(wb)
@@ -220,6 +224,8 @@ ui <- fluidPage(
           value_box(
             title = tags$p("NPS", style = "font-size: 120%;font-weight: bold;"),
             value = uiOutput("nps_subreg"),
+            showcase = plotlyOutput("graf_nps_sub"),
+            showcase_layout = "bottom"
           )
         ),
         column(
@@ -227,6 +233,8 @@ ui <- fluidPage(
           value_box(
             title = tags$p("CSAT", style = "font-size: 120%;font-weight: bold;"),
             value = uiOutput("csat_subreg"),
+            showcase = plotlyOutput("graf_csat_sub"),
+            showcase_layout = "bottom"
           )
         ),
         column(
@@ -234,13 +242,14 @@ ui <- fluidPage(
           value_box(
             title = tags$p("CES", style = "font-size: 120%;font-weight: bold;"),
             value = uiOutput("ces_subreg"),
+            showcase = plotlyOutput("graf_ces_sub"),
+            showcase_layout = "bottom"
           )
         )
       )
     )
   )
 )
-
 
 # Server ------------------------------------------------------------------
 server <- function(input, output, session){
@@ -326,7 +335,56 @@ server <- function(input, output, session){
     round(funique(data$ces),2)
   })
   
-  ### Gráficos de evolución de componentes
+  ## Gráficos de evolución de componentes
+  
+  ## NACIONAL - REGIONAL
+  ### Formato de gráficos de tipo line para value box
+  layuout_Value_box_graf <- function(x){
+    x |> 
+      layout(
+        xaxis = list(title = F,visible = T, showgrid = FALSE, color = "white"),
+        yaxis = list(visible = FALSE, showgrid = FALSE),
+        hovermode = "x",
+        margin = list(t = 0, r = 0, l = 0, b = 0),
+        paper_bgcolor = "transparent",
+        plot_bgcolor = "transparent"
+      ) |> 
+      config(displayModeBar = F)
+  }
+  
+  ### Formato de gráficos de tipo bar para FCR
+  layout_graf_bar <- function(x){
+    
+    data <- data_evo_componetes() |> fselect(fecha)
+    
+    fecha_max <- max(data$fecha)
+    fecha_min <- fecha_max - months(13)
+    
+    x |> 
+      layout(
+        yaxis = list(
+          color = "white",
+          showticklabels = FALSE
+        ),
+        xaxis = list(
+          color = "white",
+          range = c(fecha_min, fecha_max),
+          rangeselector = list(
+            buttons = list(
+              list(count = 6, label = "6 meses", step = "month", stepmode = "backward"),
+              list(count = 1, label = "1 año", step = "year", stepmode = "backward"),
+              list(step = "all", label = "Todo")
+            )
+          ),
+          rangeslider = list(visible = F, thickness = .1)
+        ),
+        hovermode = "x",
+        margin = list(t = 0, r = 0, l = 0, b = 0),
+        paper_bgcolor = "transparent",
+        plot_bgcolor = "transparent"
+      ) |> 
+    config(locale = "es")
+  }
   
   ## NPS
   output$graf_nps <- renderPlotly({
@@ -337,23 +395,15 @@ server <- function(input, output, session){
       add_lines(
         x = ~fecha,
         y = ~nps,
-        color = I("#c1121f"),
+        color = I(col_lineVB_nac),
         fill = "tozeroy",
         alpha = 0.2,
         textposition = "auto",
         hoverinfo = "text",
         hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
-                          "<br>NPS :", round(data$nps,2))
-      ) |>
-      layout(
-        xaxis = list(title = F,visible = T, showgrid = FALSE, color = "white"),
-        yaxis = list(visible = FALSE, showgrid = FALSE),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) |> 
-      config(displayModeBar = F)
+                          "<br>CSAT :", round(data$nps,2))) |> 
+      layuout_Value_box_graf()
+      
   })
   
   ## CSAT
@@ -365,23 +415,14 @@ server <- function(input, output, session){
       add_lines(
         x = ~fecha,
         y = ~csat,
-        color = I("#c1121f"),
+        color = I(col_lineVB_nac),
         fill = "tozeroy",
         alpha = 0.2,
         textposition = "auto",
         hoverinfo = "text",
         hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
-                          "<br>CSAT :", round(data$csat,2))
-      ) |>
-      layout(
-        xaxis = list(title = F,visible = T, showgrid = FALSE, color = "white"),
-        yaxis = list(visible = FALSE, showgrid = FALSE),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) |> 
-      config(displayModeBar = F)
+                          "<br>CSAT :", round(data$csat,2))) |> 
+      layuout_Value_box_graf()
   })
   
   ## CES
@@ -393,32 +434,21 @@ server <- function(input, output, session){
       add_lines(
         x = ~fecha,
         y = ~ces,
-        color = I("#c1121f"),
+        color = I(col_lineVB_nac),
         fill = "tozeroy",
         alpha = 0.2,
         textposition = "auto",
         hoverinfo = "text",
         hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
-                          "<br>CES :", round(data$ces,2))
-      ) |> 
-      layout(
-        xaxis = list(title = F,visible = TRUE, showgrid = FALSE, color = "white"),
-        yaxis = list(visible = FALSE, showgrid = FALSE),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) |> 
-      config(displayModeBar = F)
+                          "<br>CES :", round(data$ces,2))) |> 
+      layuout_Value_box_graf()
   })
   
   ## Evolución Tiempo promedio de respuesta
   output$graf_tiempo_res <- renderEcharts4r({
     
     data <- data_evo_componetes() |> fselect(fecha,tiempo_respuesta)
-    
     fecha_max <- max(data$fecha)
-    fecha_min <- fecha_max - months(13)
     
     plot_ly(x = data$fecha, 
             y = data$tiempo_respuesta,
@@ -428,38 +458,15 @@ server <- function(input, output, session){
             hoverinfo = "text",
             hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
                               "<br>TPR :", round(data$tiempo_respuesta,2))) |> 
-      layout(
-        yaxis = list(
-          color = "white",
-          showticklabels = FALSE
-        ),
-        xaxis = list(
-          color = "white",
-          range = c(fecha_min, fecha_max),
-          rangeselector = list(
-            buttons = list(
-              list(count = 6, label = "6 meses", step = "month", stepmode = "backward"),
-              list(count = 1, label = "1 año", step = "year", stepmode = "backward"),
-              list(step = "all", label = "Todo")
-            )
-          ),
-          rangeslider = list(visible = F, thickness = .1)
-        ),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) #|> 
-    #config(locale = "es") 
+      layout_graf_bar()
+    
   })
   
   ## Evolución de tasa de retención
   output$graf_tasa_ret <- renderEcharts4r({
     
     data <- data_evo_componetes() |> fselect(fecha,tasa_retencion)
-    
     fecha_max <- max(data$fecha)
-    fecha_min <- fecha_max - months(13)
     
     plot_ly(x = data$fecha, 
             y = data$tasa_retencion,
@@ -469,29 +476,7 @@ server <- function(input, output, session){
             hoverinfo = "text",
             hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
                               "<br>TPR :", round(data$tasa_retencion,2))) |> 
-      layout(
-        yaxis = list(
-          color = "white",
-          showticklabels = FALSE
-        ),
-        xaxis = list(
-          color = "white",
-          range = c(fecha_min, fecha_max),
-          rangeselector = list(
-            buttons = list(
-              list(count = 6, label = "6 meses", step = "month", stepmode = "backward"),
-              list(count = 1, label = "1 año", step = "year", stepmode = "backward"),
-              list(step = "all", label = "Todo")
-            )
-          ),
-          rangeslider = list(visible = F, thickness = .1)
-        ),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) #|> 
-    #config(locale = "es") 
+      layout_graf_bar()
   })
   
   ### Componentes NPS
@@ -595,6 +580,66 @@ server <- function(input, output, session){
       e_y_axis(axisLabel = list(color = "white",fontSize = 14), max = 100)
     
   })
+  
+  ## SUBREGION
+  ## NPS
+  output$graf_nps_sub <- renderPlotly({
+    
+    data <- data_subreg() |> fselect(fecha,nps)
+    
+    plot_ly(data, height = 100) |>
+      add_lines(
+        x = ~fecha,
+        y = ~nps,
+        color = I(col_lineVB_sub),
+        fill = "tozeroy",
+        alpha = 0.2,
+        textposition = "auto",
+        hoverinfo = "text",
+        hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
+                          "<br>CSAT :", round(data$nps,2))) |> 
+      layuout_Value_box_graf()
+    
+  })
+  
+  ## CSAT
+  output$graf_csat_sub <- renderPlotly({
+    
+    data <- data_subreg() |> fselect(fecha,csat)
+    
+    plot_ly(data, height = 100) |>
+      add_lines(
+        x = ~fecha,
+        y = ~csat,
+        color = I(col_lineVB_sub),
+        fill = "tozeroy",
+        alpha = 0.2,
+        textposition = "auto",
+        hoverinfo = "text",
+        hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
+                          "<br>CSAT :", round(data$csat,2))) |> 
+      layuout_Value_box_graf()
+  })
+  
+  ## CES
+  output$graf_ces_sub <- renderPlotly({
+    
+    data <- data_subreg() |> fselect(fecha,ces)
+    
+    plot_ly(data, height = 100) |>
+      add_lines(
+        x = ~fecha,
+        y = ~ces,
+        color = I(col_lineVB_sub),
+        fill = "tozeroy",
+        alpha = 0.2,
+        textposition = "auto",
+        hoverinfo = "text",
+        hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
+                          "<br>CES :", round(data$ces,2))) |> 
+      layuout_Value_box_graf()
+  })
+  
 }
 
 shinyApp(ui,server)
