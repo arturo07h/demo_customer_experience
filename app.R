@@ -4,16 +4,20 @@ library(bslib)
 library(rlang)
 library(plotly)
 library(echarts4r)
+library(sf)
+library(leaflet)
 
 options(encoding = "UTF-8")
 Sys.setlocale("LC_TIME", "es_ES.UTF-8")
 
 # Cargar base de datos ----------------------------------------------------
 rutaData <- "./data_customer_experience_demo.xlsx"
+rutaSF <- "./insumos/México_Estados/México_Estados.shp"
 
 # Parámetros --------------------------------------------------------------
 col_lineVB_nac <- "#c1121f"
 col_lineVB_sub <- "#31572c"
+col_polmap <- "#3c0663"
 
 # Leer bases --------------------------------------------------------------
 wb <- openxlsx2::wb_load(rutaData)
@@ -73,7 +77,19 @@ list_data_gen_ultimo_valor <- lapply(list_data_gen,function(x){
 data_ultimo_valor <- rowbind(list_data_gen_ultimo_valor) |> 
   fselect(-c(promotores_pct:pasivos_pct)) 
 
-# ui ----------------------------------------------------------------------
+## Cargar SF para información local
+shp_mexico <- read_sf(rutaSF) |> 
+  fmutate(ESTADO = ESTADO |> stringr::str_replace_all(
+    c("México" = "Estado de México",
+    "Distrito Federal" = "Ciudad de México")
+  ))
+
+data_sucursal <- dataMetricas |> fmutate(estado = estado |> stringr::str_squish())
+rel_reg_edo <- data_sucursal |> fcount(id_region,estado,sort = T)
+
+shp_mexico <- join(x = shp_mexico,y = rel_reg_edo, on = c("ESTADO" = "estado"),how = "left")
+
+  # ui ----------------------------------------------------------------------
 
 ## Tema 
 theme <- bs_theme(
@@ -246,6 +262,12 @@ ui <- fluidPage(
             showcase_layout = "bottom"
           )
         )
+      ),
+      fluidRow(
+        column(
+          12,
+          leafletOutput("map_reg")
+        )
       )
     )
   )
@@ -285,6 +307,15 @@ server <- function(input, output, session){
   ### Data de evolución de componentes
   data_evo_componetes <- reactive({
     data_gen |> fsubset(id_region == input$vect_drv)
+  })
+  
+  ## SHP reactivo para info regional
+  shp_reactivo <- reactive({
+    if(input$vect_drv == "Nacional"){
+      shp_mexico
+    }else{
+      shp_mexico |> fsubset(id_region == input$vect_drv)
+    }
   })
   
   ## Creación de objetos
@@ -638,6 +669,77 @@ server <- function(input, output, session){
         hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
                           "<br>CES :", round(data$ces,2))) |> 
       layuout_Value_box_graf()
+  })
+  
+  ## Información regional
+  output$map_reg <- renderLeaflet({
+    
+    # browser()
+    leaflet() |> 
+      addTiles("http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+               attribution = paste(
+                 "&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap</a> contributors",
+                 "&copy; <a href=\"http://cartodb.com/attributions\">CartoDB</a>")
+      ) |>
+      setView(lng = -102.5528, lat = 23.6345, zoom = 5) |> 
+      add_polygons(
+        data = shp_reactivo(),
+        color = col_polmap,
+        fillOpacity = 0.5,
+        weight = 2
+      )
+  })
+  
+  observeEvent(input$vect_drv,{
+
+    if (input$vect_drv == "Nacional") {return()}
+
+    ## Polígonos
+    zona_lat <- sf::st_coordinates(shp_reactivo()) |> as_tibble()
+
+    flng1 <- fmin(zona_lat$X)
+    flng2 <- fmax(zona_lat$X)
+
+    flat1 <- fmin(zona_lat$Y)
+    flat2 <- fmax(zona_lat$Y)
+
+    # browser()
+    # data_suc_resumen <- data_suc() %>%
+    #   fgroup_by(sucursal, fecha, longitud, latitud) %>%
+    #   fsummarise(
+    #     suma_total = sum(N, na.rm = TRUE),
+    #     Alta = scales::percent(sum(por[gravedad == "Alta"], na.rm = TRUE), accuracy = 1),
+    #     Media = scales::percent(sum(por[gravedad == "Media"], na.rm = TRUE), accuracy = 1),
+    #     Baja = scales::percent(sum(por[gravedad == "Baja"], na.rm = TRUE), accuracy = 1)) |>
+    #   fungroup()
+
+    leafletProxy("map_reg") |>
+      clearShapes() |>
+      addPolygons(data = shp_reactivo(),
+                  color = col_polmap,
+                  label = ~ ESTADO,
+                  fillOpacity = 0.5,
+                  weight = 2,
+                  popup = ~ paste("Estado:", ESTADO)) |>
+      # addMarkers(
+      #   data = data_suc_resumen,
+      #   lng = ~longitud,
+      #   lat = ~latitud,
+      #   popup = ~paste0(
+      #     "<b>Sucursal: </b>", sucursal, "<br>",
+      #     "<b>Mes de consulta: </b>", fecha, "<br>",
+      #     "<b>Total de quejas mensuales: </b>", suma_total, "<br>",
+      #     "<b>Gravedad</b><br>",
+      #     fifelse(Alta != "0%", paste0("<b>Alta: </b>", Alta, "<br>"), paste0("<b>Alta: </b>","0%", "<br>")),
+      #     fifelse(Media != "0%", paste0("<b>Media: </b>", Media, "<br>"), paste0("<b>Media: </b>","0%", "<br>")),
+      #     fifelse(Baja != "0%", paste0("<b>Baja: </b>", Baja), paste0("<b>Baja: </b>","0%", "<br>"))
+      #   )) |>
+      flyToBounds(
+        lng1 = flng1,
+        lng2 = flng2,
+        lat1 = flat1,
+        lat2 = flat2
+      )
   })
   
 }
