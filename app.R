@@ -4,7 +4,6 @@ library(bslib)
 library(rlang)
 library(plotly)
 library(echarts4r)
-library(sf)
 library(leaflet)
 
 options(encoding = "UTF-8")
@@ -12,7 +11,7 @@ Sys.setlocale("LC_TIME", "es_ES.UTF-8")
 
 # Cargar base de datos ----------------------------------------------------
 rutaData <- "./data_customer_experience_demo.xlsx"
-rutaSF <- "./insumos/México_Estados/México_Estados.shp"
+rutaSF <- "./insumos/México_Estados/mexico_drv.shp"
 
 # Parámetros --------------------------------------------------------------
 col_lineVB_nac <- "#c1121f"
@@ -78,7 +77,7 @@ data_ultimo_valor <- rowbind(list_data_gen_ultimo_valor) |>
   fselect(-c(promotores_pct:pasivos_pct)) 
 
 ## Cargar SF para información local
-shp_mexico <- read_sf(rutaSF) |> 
+shp_mexico <- sf::read_sf("insumos/México_Estados/mexico_drv.shp") |> 
   fmutate(ESTADO = ESTADO |> stringr::str_replace_all(
     c("México" = "Estado de México",
     "Distrito Federal" = "Ciudad de México")
@@ -89,7 +88,7 @@ rel_reg_edo <- data_sucursal |> fcount(id_region,estado,sort = T)
 
 shp_mexico <- join(x = shp_mexico,y = rel_reg_edo, on = c("ESTADO" = "estado"),how = "left")
 
-  # ui ----------------------------------------------------------------------
+# ui ----------------------------------------------------------------------
 
 ## Tema 
 theme <- bs_theme(
@@ -311,6 +310,7 @@ server <- function(input, output, session){
   
   ## SHP reactivo para info regional
   shp_reactivo <- reactive({
+    
     if(input$vect_drv == "Nacional"){
       shp_mexico
     }else{
@@ -674,7 +674,6 @@ server <- function(input, output, session){
   ## Información regional
   output$map_reg <- renderLeaflet({
     
-    # browser()
     leaflet() |> 
       addTiles("http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
                attribution = paste(
@@ -682,11 +681,11 @@ server <- function(input, output, session){
                  "&copy; <a href=\"http://cartodb.com/attributions\">CartoDB</a>")
       ) |>
       setView(lng = -102.5528, lat = 23.6345, zoom = 5) |> 
-      add_polygons(
+      addPolygons(
         data = shp_reactivo(),
-        color = col_polmap,
-        fillOpacity = 0.5,
-        weight = 2
+        fillOpacity = 0.4,
+        weight = 2,
+        color = col_lineVB_sub,
       )
   })
   
@@ -695,7 +694,7 @@ server <- function(input, output, session){
     if (input$vect_drv == "Nacional") {return()}
 
     ## Polígonos
-    zona_lat <- sf::st_coordinates(shp_reactivo()) |> as_tibble()
+    zona_lat <- sf::st_coordinates(shp_reactivo()) |> tibble::as_tibble()
 
     flng1 <- fmin(zona_lat$X)
     flng2 <- fmax(zona_lat$X)
