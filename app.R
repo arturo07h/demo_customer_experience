@@ -4,12 +4,19 @@ library(bslib)
 library(rlang)
 library(plotly)
 library(echarts4r)
+library(leaflet)
 
 options(encoding = "UTF-8")
 Sys.setlocale("LC_TIME", "es_ES.UTF-8")
 
 # Cargar base de datos ----------------------------------------------------
 rutaData <- "./data_customer_experience_demo.xlsx"
+rutaSF <- "./insumos/México_Estados/mexico_drv.shp"
+
+# Parámetros --------------------------------------------------------------
+col_lineVB_nac <- "#c1121f"
+col_lineVB_sub <- "#31572c"
+col_polmap <- "#3c0663"
 
 # Leer bases --------------------------------------------------------------
 wb <- openxlsx2::wb_load(rutaData)
@@ -23,7 +30,9 @@ list_sheets_dataRaw <- names_sheet_dataRaw  |>  set_names() |>
 dataMetricas <- list_sheets_dataRaw$`Sheet 1`
 
 ## Vectores de aplicación
-vect_drv <- c("Nacional",funique(dataMetricas$id_region))
+vect_input <- dataMetricas |> fcount(id_region,id_subregion,sort = T) |>
+  rowbind(data.frame(id_region = "Nacional",id_subregion = "R1-S1", N = NA)) |> 
+  fselect(-N)
 
 ## Cálculos por DRV y Subregion y por mes
 
@@ -67,6 +76,18 @@ list_data_gen_ultimo_valor <- lapply(list_data_gen,function(x){
 data_ultimo_valor <- rowbind(list_data_gen_ultimo_valor) |> 
   fselect(-c(promotores_pct:pasivos_pct)) 
 
+## Cargar SF para información local
+shp_mexico <- sf::read_sf("insumos/México_Estados/mexico_drv.shp") |> 
+  fmutate(ESTADO = ESTADO |> stringr::str_replace_all(
+    c("México" = "Estado de México",
+    "Distrito Federal" = "Ciudad de México")
+  ))
+
+data_sucursal <- dataMetricas |> fmutate(estado = estado |> stringr::str_squish())
+rel_reg_edo <- data_sucursal |> fcount(id_region,estado,sort = T)
+
+shp_mexico <- join(x = shp_mexico,y = rel_reg_edo, on = c("ESTADO" = "estado"),how = "left")
+
 # ui ----------------------------------------------------------------------
 
 ## Tema 
@@ -75,162 +96,226 @@ theme <- bs_theme(
   "input-border-color" = "white"
 )
 
-vbx <- list(
-  
-  value_box(
-    title = tags$p("NPS", style = "font-size: 200%;font-weight: bold;"),
-    value = uiOutput("value_nps"),
-    showcase = plotlyOutput("graf_nps"),
-    showcase_layout = "bottom"
-  ),
-  
-  value_box(
-    title = tags$p("CSAT", style = "font-size: 200%;font-weight: bold;"),
-    value = uiOutput("value_csat"),
-    showcase = plotlyOutput("graf_csat"),
-    showcase_layout = "bottom"
-  ),
-  
-  value_box(
-    title = tags$p("CES", style = "font-size: 200%;font-weight: bold;"),
-    value = uiOutput("value_ces"),
-    showcase = plotlyOutput("graf_ces"),
-    showcase_layout = "bottom"
-  )
-  
-)
-
 ## UI
 ui <- fluidPage(
   
   theme = theme,
   
-  ## Estilo de values box
-  tags$style(HTML("
+  tags$h2("Indicadores de experiencia del cliente"),
+  
+  tabsetPanel(
+   
+    tabPanel(
+      "Info. Nacional",
+      
+      ## Estilo de values box
+      tags$style(HTML("
     .card {
       background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
       border: none; /* Opcional: quitar bordes */
       box-shadow: none; /* Opcional: quitar sombra */
-    }
-  ")),
-  
-  ## Título y filtro regional
-  fluidRow(
-    column(
-      9,
-      tags$h2("Indicadores de experiencia del cliente"),
-    ),
-    column(
-      3,
-      selectInput(inputId = "vect_drv", choices = vect_drv, label = "Selecciona tu región:", selected = "Nacional")
-    )
-  ),
-  
-  ## Columns de values box
-  fluidRow(
-    column(
-      4 ,
-      value_box(
-        title = tags$p("NPS", style = "font-size: 200%;font-weight: bold;"),
-        value = uiOutput("value_nps"),
-        showcase = plotlyOutput("graf_nps"),
-        showcase_layout = "bottom"
-      )
-    ),
-    column(
-      4,
-      value_box(
-        title = tags$p("CSAT", style = "font-size: 200%;font-weight: bold;"),
-        value = uiOutput("value_csat"),
-        showcase = plotlyOutput("graf_csat"),
-        showcase_layout = "bottom"
-      )
-    ),
-    column(
-      4,
-      value_box(
-        title = tags$p("CES", style = "font-size: 200%;font-weight: bold;"),
-        value = uiOutput("value_ces"),
-        showcase = plotlyOutput("graf_ces"),
-        showcase_layout = "bottom"
-      )
-    )
-  ),
-  fluidRow(
-    column(
-      4,
-      div(
-        style = "
-        background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
-        border: none; /* Opcional: quitar bordes */
-        box-shadow: none; /* Opcional: quitar sombra */
-        border-radius: 15px; /* Esquinas redondeadas */
-        padding: 10px; /* Opcional: espacio interno */
-        height: 430px;
-        width:100%; 
-        ",
-        echarts4rOutput("graf_nps_comp", height = "400px", width = "100%")
-      )
-    ),
-    column(
-      4,
-      div(
-        # class = "small-graph", 
-        style = "
-        background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
-        border: none; /* Opcional: quitar bordes */
-        box-shadow: none; /* Opcional: quitar sombra */
-        border-radius: 15px; /* Esquinas redondeadas */
-        padding: 10px; /* Opcional: espacio interno */
-        height: 430px;
-        width:100%; 
-        ",
-        echarts4rOutput("graf_evo_fcr", height = "240px", width = "100%"),
-        echarts4rOutput("graf_fcr_gauge", height = "250px", width = "100%")
-      )
-    ),
-    column(
-      4,
-      div(
-        style = "
-        display: flex; 
-        flex-direction: column; 
-        align-items: left; 
-        height: 450px;
-        width:100%; 
-        ",
-        value_box(
-          title = tags$p("Tiempo promedio de respuesta", style = "font-size: 120%;font-weight: bold;"),
-          value = uiOutput("value_tiempo_resp"),
-          showcase = plotlyOutput("graf_tiempo_res"),
-          showcase_layout = "bottom"
+      }")),
+      
+      ## Título y filtro regional
+      fluidRow(
+        column(
+          3,
+          selectInput(
+            inputId = "vect_drv", 
+            choices = funique(vect_input$id_region), 
+            label = "Selecciona tu región:", 
+            selected = "Nacional"
+          )
+        )
+      ),
+      
+      ## Columns de values box
+      fluidRow(
+        column(
+          4 ,
+          value_box(
+            title = tags$p("NPS", style = "font-size: 200%;font-weight: bold;"),
+            value = uiOutput("value_nps"),
+            showcase = plotlyOutput("graf_nps"),
+            showcase_layout = "bottom"
+          )
         ),
-        value_box(
-          title = tags$p("Tasa de retención", style = "font-size: 120%;font-weight: bold;"),
-          value = uiOutput("value_tasa_ret"),
-          showcase = plotlyOutput("graf_tasa_ret"),
-          showcase_layout = "bottom"
+        column(
+          4,
+          value_box(
+            title = tags$p("CSAT", style = "font-size: 200%;font-weight: bold;"),
+            value = uiOutput("value_csat"),
+            showcase = plotlyOutput("graf_csat"),
+            showcase_layout = "bottom"
+          )
+        ),
+        column(
+          4,
+          value_box(
+            title = tags$p("CES", style = "font-size: 200%;font-weight: bold;"),
+            value = uiOutput("value_ces"),
+            showcase = plotlyOutput("graf_ces"),
+            showcase_layout = "bottom"
+          )
+        )
+      ),
+      fluidRow(
+        column(
+          4,
+          div(
+            style = "
+        background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
+        border: none; /* Opcional: quitar bordes */
+        box-shadow: none; /* Opcional: quitar sombra */
+        border-radius: 15px; /* Esquinas redondeadas */
+        padding: 10px; /* Opcional: espacio interno */
+        height: 430px;
+        width:100%; 
+        ",
+            echarts4rOutput("graf_nps_comp", height = "400px", width = "100%")
+          )
+        ),
+        column(
+          4,
+          div(
+            # class = "small-graph", 
+            style = "
+        background-color: rgba(255, 255, 255, 0.5) !important; /* Fondo semitransparente */
+        border: none; /* Opcional: quitar bordes */
+        box-shadow: none; /* Opcional: quitar sombra */
+        border-radius: 15px; /* Esquinas redondeadas */
+        padding: 10px; /* Opcional: espacio interno */
+        height: 430px;
+        width:100%; 
+        ",
+            echarts4rOutput("graf_evo_fcr", height = "240px", width = "100%"),
+            echarts4rOutput("graf_fcr_gauge", height = "250px", width = "100%")
+          )
+        ),
+        column(
+          4,
+          div(
+            style = "
+            display: flex; 
+            flex-direction: column; 
+            align-items: left; 
+            height: 450px;
+            width:100%; 
+            ",
+            value_box(
+              title = tags$p("Tiempo promedio de respuesta", style = "font-size: 120%;font-weight: bold;"),
+              value = uiOutput("value_tiempo_resp"),
+              showcase = plotlyOutput("graf_tiempo_res"),
+              showcase_layout = "bottom"
+            ),
+            value_box(
+              title = tags$p("Tasa de retención", style = "font-size: 120%;font-weight: bold;"),
+              value = uiOutput("value_tasa_ret"),
+              showcase = plotlyOutput("graf_tasa_ret"),
+              showcase_layout = "bottom"
+            )
+          )
+        )
+      )
+      
+    ),
+    
+    tabPanel(
+      "Local",
+      fluidRow(
+        column(
+          3,
+          selectInput(
+            inputId = "vect_sdrv", 
+            choices = funique(vect_input$id_subregion), 
+            label = "Selecciona tu subregión:", 
+            selected = "R1-S1"
+          )
+        )
+      ),
+      fluidRow(
+        column(
+          4,
+          value_box(
+            title = tags$p("NPS", style = "font-size: 120%;font-weight: bold;"),
+            value = uiOutput("nps_subreg"),
+            showcase = plotlyOutput("graf_nps_sub"),
+            showcase_layout = "bottom"
+          )
+        ),
+        column(
+          4,
+          value_box(
+            title = tags$p("CSAT", style = "font-size: 120%;font-weight: bold;"),
+            value = uiOutput("csat_subreg"),
+            showcase = plotlyOutput("graf_csat_sub"),
+            showcase_layout = "bottom"
+          )
+        ),
+        column(
+          4,
+          value_box(
+            title = tags$p("CES", style = "font-size: 120%;font-weight: bold;"),
+            value = uiOutput("ces_subreg"),
+            showcase = plotlyOutput("graf_ces_sub"),
+            showcase_layout = "bottom"
+          )
+        )
+      ),
+      fluidRow(
+        column(
+          12,
+          leafletOutput("map_reg")
         )
       )
     )
   )
 )
 
-## Server
-server <- function(input, output){
+# Server ------------------------------------------------------------------
+server <- function(input, output, session){
+  
+  ## Filtros update
+  observe({
+    updateSelectInput(
+      session,
+      "vect_drv",
+      choices = sort(funique(vect_input$id_region))
+    )
+  })
+  
+  observe({
+    updateSelectInput(
+      session,
+      "vect_sdrv",
+      choices = vect_input |> 
+        fsubset(id_region == input$vect_drv) |> 
+        select(id_subregion) %>%
+        .[[1]] %>% 
+        sort(.)
+    )
+  })
   
   ## Sección de data reactiva
   
   ### Valor actual de componentes
   data_componentes <- reactive({
-    
     data_ultimo_valor |> fsubset(id_region == input$vect_drv)
-    
   })
   
   ### Data de evolución de componentes
   data_evo_componetes <- reactive({
     data_gen |> fsubset(id_region == input$vect_drv)
+  })
+  
+  ## SHP reactivo para info regional
+  shp_reactivo <- reactive({
+    
+    if(input$vect_drv == "Nacional"){
+      shp_mexico
+    }else{
+      shp_mexico |> fsubset(id_region == input$vect_drv)
+    }
   })
   
   ## Creación de objetos
@@ -256,7 +341,81 @@ server <- function(input, output){
     round(funique(data_componentes()$tasa_retencion),2)
   })
   
-  ### Gráficos de evolución de componentes
+  ## Componentes por subregion 
+  data_subreg <- reactive({
+    data_subregiones |> fsubset(id_subregion == input$vect_sdrv)
+  })
+  
+  ## Value box con echaerts4r para Subregiones
+  
+  ### NPS 
+  output$nps_subreg <- renderText({
+    data <- data_subreg() |> fsubset(fecha == fmax(fecha))
+    round(funique(data$nps),2)
+  })
+  
+  ### CSAT
+  output$csat_subreg <- renderText({
+    data <- data_subreg() |> fsubset(fecha == fmax(fecha))
+    round(funique(data$csat),2)
+  })
+  
+  ### CES
+  output$ces_subreg <- renderText({
+    data <- data_subreg() |> fsubset(fecha == fmax(fecha))
+    round(funique(data$ces),2)
+  })
+  
+  ## Gráficos de evolución de componentes
+  
+  ## NACIONAL - REGIONAL
+  ### Formato de gráficos de tipo line para value box
+  layuout_Value_box_graf <- function(x){
+    x |> 
+      layout(
+        xaxis = list(title = F,visible = T, showgrid = FALSE, color = "white"),
+        yaxis = list(visible = FALSE, showgrid = FALSE),
+        hovermode = "x",
+        margin = list(t = 0, r = 0, l = 0, b = 0),
+        paper_bgcolor = "transparent",
+        plot_bgcolor = "transparent"
+      ) |> 
+      config(displayModeBar = F)
+  }
+  
+  ### Formato de gráficos de tipo bar para FCR
+  layout_graf_bar <- function(x){
+    
+    data <- data_evo_componetes() |> fselect(fecha)
+    
+    fecha_max <- max(data$fecha)
+    fecha_min <- fecha_max - months(13)
+    
+    x |> 
+      layout(
+        yaxis = list(
+          color = "white",
+          showticklabels = FALSE
+        ),
+        xaxis = list(
+          color = "white",
+          range = c(fecha_min, fecha_max),
+          rangeselector = list(
+            buttons = list(
+              list(count = 6, label = "6 meses", step = "month", stepmode = "backward"),
+              list(count = 1, label = "1 año", step = "year", stepmode = "backward"),
+              list(step = "all", label = "Todo")
+            )
+          ),
+          rangeslider = list(visible = F, thickness = .1)
+        ),
+        hovermode = "x",
+        margin = list(t = 0, r = 0, l = 0, b = 0),
+        paper_bgcolor = "transparent",
+        plot_bgcolor = "transparent"
+      ) |> 
+    config(locale = "es")
+  }
   
   ## NPS
   output$graf_nps <- renderPlotly({
@@ -267,23 +426,15 @@ server <- function(input, output){
       add_lines(
         x = ~fecha,
         y = ~nps,
-        color = I("#c1121f"),
+        color = I(col_lineVB_nac),
         fill = "tozeroy",
         alpha = 0.2,
         textposition = "auto",
         hoverinfo = "text",
         hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
-                          "<br>NPS :", round(data$nps,2))
-      ) |>
-      layout(
-        xaxis = list(title = F,visible = T, showgrid = FALSE, color = "white"),
-        yaxis = list(visible = FALSE, showgrid = FALSE),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) |> 
-      config(displayModeBar = F)
+                          "<br>CSAT :", round(data$nps,2))) |> 
+      layuout_Value_box_graf()
+      
   })
   
   ## CSAT
@@ -295,23 +446,14 @@ server <- function(input, output){
       add_lines(
         x = ~fecha,
         y = ~csat,
-        color = I("#c1121f"),
+        color = I(col_lineVB_nac),
         fill = "tozeroy",
         alpha = 0.2,
         textposition = "auto",
         hoverinfo = "text",
         hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
-                          "<br>CSAT :", round(data$csat,2))
-      ) |>
-      layout(
-        xaxis = list(title = F,visible = T, showgrid = FALSE, color = "white"),
-        yaxis = list(visible = FALSE, showgrid = FALSE),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) |> 
-      config(displayModeBar = F)
+                          "<br>CSAT :", round(data$csat,2))) |> 
+      layuout_Value_box_graf()
   })
   
   ## CES
@@ -323,32 +465,21 @@ server <- function(input, output){
       add_lines(
         x = ~fecha,
         y = ~ces,
-        color = I("#c1121f"),
+        color = I(col_lineVB_nac),
         fill = "tozeroy",
         alpha = 0.2,
         textposition = "auto",
         hoverinfo = "text",
         hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
-                          "<br>CES :", round(data$ces,2))
-      ) |> 
-      layout(
-        xaxis = list(title = F,visible = TRUE, showgrid = FALSE, color = "white"),
-        yaxis = list(visible = FALSE, showgrid = FALSE),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) |> 
-      config(displayModeBar = F)
+                          "<br>CES :", round(data$ces,2))) |> 
+      layuout_Value_box_graf()
   })
   
   ## Evolución Tiempo promedio de respuesta
   output$graf_tiempo_res <- renderEcharts4r({
     
     data <- data_evo_componetes() |> fselect(fecha,tiempo_respuesta)
-    
     fecha_max <- max(data$fecha)
-    fecha_min <- fecha_max - months(13)
     
     plot_ly(x = data$fecha, 
             y = data$tiempo_respuesta,
@@ -358,38 +489,15 @@ server <- function(input, output){
             hoverinfo = "text",
             hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
                               "<br>TPR :", round(data$tiempo_respuesta,2))) |> 
-      layout(
-        yaxis = list(
-          color = "white",
-          showticklabels = FALSE
-        ),
-        xaxis = list(
-          color = "white",
-          range = c(fecha_min, fecha_max),
-          rangeselector = list(
-            buttons = list(
-              list(count = 6, label = "6 meses", step = "month", stepmode = "backward"),
-              list(count = 1, label = "1 año", step = "year", stepmode = "backward"),
-              list(step = "all", label = "Todo")
-            )
-          ),
-          rangeslider = list(visible = F, thickness = .1)
-        ),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) #|> 
-    #config(locale = "es") 
+      layout_graf_bar()
+    
   })
   
   ## Evolución de tasa de retención
   output$graf_tasa_ret <- renderEcharts4r({
     
     data <- data_evo_componetes() |> fselect(fecha,tasa_retencion)
-    
     fecha_max <- max(data$fecha)
-    fecha_min <- fecha_max - months(13)
     
     plot_ly(x = data$fecha, 
             y = data$tasa_retencion,
@@ -399,29 +507,7 @@ server <- function(input, output){
             hoverinfo = "text",
             hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
                               "<br>TPR :", round(data$tasa_retencion,2))) |> 
-      layout(
-        yaxis = list(
-          color = "white",
-          showticklabels = FALSE
-        ),
-        xaxis = list(
-          color = "white",
-          range = c(fecha_min, fecha_max),
-          rangeselector = list(
-            buttons = list(
-              list(count = 6, label = "6 meses", step = "month", stepmode = "backward"),
-              list(count = 1, label = "1 año", step = "year", stepmode = "backward"),
-              list(step = "all", label = "Todo")
-            )
-          ),
-          rangeslider = list(visible = F, thickness = .1)
-        ),
-        hovermode = "x",
-        margin = list(t = 0, r = 0, l = 0, b = 0),
-        paper_bgcolor = "transparent",
-        plot_bgcolor = "transparent"
-      ) #|> 
-    #config(locale = "es") 
+      layout_graf_bar()
   })
   
   ### Componentes NPS
@@ -525,6 +611,136 @@ server <- function(input, output){
       e_y_axis(axisLabel = list(color = "white",fontSize = 14), max = 100)
     
   })
+  
+  ## SUBREGION
+  ## NPS
+  output$graf_nps_sub <- renderPlotly({
+    
+    data <- data_subreg() |> fselect(fecha,nps)
+    
+    plot_ly(data, height = 100) |>
+      add_lines(
+        x = ~fecha,
+        y = ~nps,
+        color = I(col_lineVB_sub),
+        fill = "tozeroy",
+        alpha = 0.2,
+        textposition = "auto",
+        hoverinfo = "text",
+        hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
+                          "<br>CSAT :", round(data$nps,2))) |> 
+      layuout_Value_box_graf()
+    
+  })
+  
+  ## CSAT
+  output$graf_csat_sub <- renderPlotly({
+    
+    data <- data_subreg() |> fselect(fecha,csat)
+    
+    plot_ly(data, height = 100) |>
+      add_lines(
+        x = ~fecha,
+        y = ~csat,
+        color = I(col_lineVB_sub),
+        fill = "tozeroy",
+        alpha = 0.2,
+        textposition = "auto",
+        hoverinfo = "text",
+        hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
+                          "<br>CSAT :", round(data$csat,2))) |> 
+      layuout_Value_box_graf()
+  })
+  
+  ## CES
+  output$graf_ces_sub <- renderPlotly({
+    
+    data <- data_subreg() |> fselect(fecha,ces)
+    
+    plot_ly(data, height = 100) |>
+      add_lines(
+        x = ~fecha,
+        y = ~ces,
+        color = I(col_lineVB_sub),
+        fill = "tozeroy",
+        alpha = 0.2,
+        textposition = "auto",
+        hoverinfo = "text",
+        hovertext = paste("Fecha :", format(data$fecha,"%B %Y"),
+                          "<br>CES :", round(data$ces,2))) |> 
+      layuout_Value_box_graf()
+  })
+  
+  ## Información regional
+  output$map_reg <- renderLeaflet({
+    
+    leaflet() |> 
+      addTiles("http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+               attribution = paste(
+                 "&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap</a> contributors",
+                 "&copy; <a href=\"http://cartodb.com/attributions\">CartoDB</a>")
+      ) |>
+      setView(lng = -102.5528, lat = 23.6345, zoom = 5) |> 
+      addPolygons(
+        data = shp_reactivo(),
+        fillOpacity = 0.4,
+        weight = 2,
+        color = col_lineVB_sub,
+      )
+  })
+  
+  observeEvent(input$vect_drv,{
+
+    if (input$vect_drv == "Nacional") {return()}
+
+    ## Polígonos
+    zona_lat <- sf::st_coordinates(shp_reactivo()) |> tibble::as_tibble()
+
+    flng1 <- fmin(zona_lat$X)
+    flng2 <- fmax(zona_lat$X)
+
+    flat1 <- fmin(zona_lat$Y)
+    flat2 <- fmax(zona_lat$Y)
+
+    # browser()
+    # data_suc_resumen <- data_suc() %>%
+    #   fgroup_by(sucursal, fecha, longitud, latitud) %>%
+    #   fsummarise(
+    #     suma_total = sum(N, na.rm = TRUE),
+    #     Alta = scales::percent(sum(por[gravedad == "Alta"], na.rm = TRUE), accuracy = 1),
+    #     Media = scales::percent(sum(por[gravedad == "Media"], na.rm = TRUE), accuracy = 1),
+    #     Baja = scales::percent(sum(por[gravedad == "Baja"], na.rm = TRUE), accuracy = 1)) |>
+    #   fungroup()
+
+    leafletProxy("map_reg") |>
+      clearShapes() |>
+      addPolygons(data = shp_reactivo(),
+                  color = col_polmap,
+                  label = ~ ESTADO,
+                  fillOpacity = 0.5,
+                  weight = 2,
+                  popup = ~ paste("Estado:", ESTADO)) |>
+      # addMarkers(
+      #   data = data_suc_resumen,
+      #   lng = ~longitud,
+      #   lat = ~latitud,
+      #   popup = ~paste0(
+      #     "<b>Sucursal: </b>", sucursal, "<br>",
+      #     "<b>Mes de consulta: </b>", fecha, "<br>",
+      #     "<b>Total de quejas mensuales: </b>", suma_total, "<br>",
+      #     "<b>Gravedad</b><br>",
+      #     fifelse(Alta != "0%", paste0("<b>Alta: </b>", Alta, "<br>"), paste0("<b>Alta: </b>","0%", "<br>")),
+      #     fifelse(Media != "0%", paste0("<b>Media: </b>", Media, "<br>"), paste0("<b>Media: </b>","0%", "<br>")),
+      #     fifelse(Baja != "0%", paste0("<b>Baja: </b>", Baja), paste0("<b>Baja: </b>","0%", "<br>"))
+      #   )) |>
+      flyToBounds(
+        lng1 = flng1,
+        lng2 = flng2,
+        lat1 = flat1,
+        lat2 = flat2
+      )
+  })
+  
 }
 
 shinyApp(ui,server)
