@@ -169,7 +169,7 @@ ui <- fluidPage(
         box-shadow: none; /* Opcional: quitar sombra */
         border-radius: 15px; /* Esquinas redondeadas */
         padding: 10px; /* Opcional: espacio interno */
-        height: 430px;
+        height: 420px;
         width:100%; 
         ",
             echarts4rOutput("graf_nps_comp", height = "400px", width = "100%")
@@ -185,7 +185,7 @@ ui <- fluidPage(
         box-shadow: none; /* Opcional: quitar sombra */
         border-radius: 15px; /* Esquinas redondeadas */
         padding: 10px; /* Opcional: espacio interno */
-        height: 430px;
+        height: 420px;
         width:100%; 
         ",
             echarts4rOutput("graf_evo_fcr", height = "240px", width = "100%"),

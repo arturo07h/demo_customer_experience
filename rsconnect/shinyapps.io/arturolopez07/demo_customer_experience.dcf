@@ -1,0 +1,13 @@
+name: demo_customer_experience
+title: demo_customer_experience
+username: arturolopez07
+account: arturolopez07
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13962197
+bundleId: 9868498
+url: https://arturolopez07.shinyapps.io/demo_customer_experience/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: acceso_go.rds|data_restaurantes_demo.xlsx|data_restaurantes.xlsx|LICENSE|procesamiento.R|README.md
