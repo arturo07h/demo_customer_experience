@@ -13,9 +13,6 @@ data_raw <- openxlsx2::read_xlsx(file = ruta_dataRaw) |>
 # Procesar data -----------------------------------------------------------
 ultimo_registro <- fmax(data_raw$fechas_registro)
 
-
-
-
 set.seed(123)
 ## Simulaciones
 
